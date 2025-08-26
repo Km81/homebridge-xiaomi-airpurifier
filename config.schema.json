@@ -4,12 +4,15 @@
   "singular": true,
   "schema": {
     "type": "object",
+    "required": ["deviceCfgs"],
     "properties": {
       "deviceCfgs": {
         "title": "Devices",
         "type": "array",
+        "minItems": 1,
         "items": {
           "type": "object",
+          "required": ["name", "ip", "token", "type"],
           "properties": {
             "name": {
               "title": "Name (공기청정기 이름)",
@@ -19,11 +22,14 @@
             "ip": {
               "title": "IP Address",
               "type": "string",
-              "format": "ipv4"
+              "format": "ipv4",
+              "pattern": "^(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3}$"
             },
             "token": {
               "title": "Token",
-              "type": "string"
+              "type": "string",
+              "pattern": "^[A-Fa-f0-9]{32}$",
+              "description": "miio 32자리 HEX 토큰"
             },
             "type": {
               "title": "Model (모델)",
@@ -41,7 +47,7 @@
             "temperatureName": {
               "title": "Temperature Sensor Name (온도 센서 이름)",
               "type": "string",
-              "condition": { "functionBody": "return model.showTemperature === true" }
+              "condition": { "functionBody": "return model && model.showTemperature === true;" }
             },
             "showHumidity": {
               "title": "Show Humidity Sensor (습도 센서 표시)",
@@ -51,7 +57,7 @@
             "humidityName": {
               "title": "Humidity Sensor Name (습도 센서 이름)",
               "type": "string",
-              "condition": { "functionBody": "return model.showHumidity === true" }
+              "condition": { "functionBody": "return model && model.showHumidity === true;" }
             },
             "showAirQuality": {
               "title": "Show Air Quality Sensor (공기질 센서 표시)",
@@ -61,12 +67,12 @@
             "airQualityName": {
               "title": "Air Quality Sensor Name (공기질 센서 이름)",
               "type": "string",
-              "condition": { "functionBody": "return model.showAirQuality === true" }
+              "condition": { "functionBody": "return model && model.showAirQuality === true;" }
             },
             "showLED": {
               "title": "Show LED Control Switch (LED 제어 스위치 표시)",
               "type": "boolean",
-              "default": false
+              "default": false"
             },
             "showBuzzer": {
               "title": "Show Buzzer Control Switch (부저 제어 스위치 표시)",
@@ -79,13 +85,7 @@
               "type": "boolean",
               "default": false
             }
-          },
-          "required": [
-            "name",
-            "ip",
-            "token",
-            "type"
-          ]
+          }
         }
       }
     }
@@ -96,19 +96,19 @@
       "type": "array",
       "title": "기기 목록 (ADD DEVICE 버튼으로 추가)",
       "items": [
-        "name",
-        "ip",
-        "token",
-        "type",
-        "showTemperature",
-        "temperatureName",
-        "showHumidity",
-        "humidityName",
-        "showAirQuality",
-        "airQualityName",
-        "showLED",
-        "showBuzzer",
-        "showModeSwitches"
+        "deviceCfgs[].name",
+        "deviceCfgs[].ip",
+        "deviceCfgs[].token",
+        "deviceCfgs[].type",
+        "deviceCfgs[].showTemperature",
+        "deviceCfgs[].temperatureName",
+        "deviceCfgs[].showHumidity",
+        "deviceCfgs[].humidityName",
+        "deviceCfgs[].showAirQuality",
+        "deviceCfgs[].airQualityName",
+        "deviceCfgs[].showLED",
+        "deviceCfgs[].showBuzzer",
+        "deviceCfgs[].showModeSwitches"
       ]
     }
   ]
