@@ -86,7 +86,9 @@ class DeviceHandler {
     this.accessory = accessory;
     this.config = accessory.context.device;
     this.device = null; // miio device instance
-    this.state = {}; // cache for device state
+    
+    // Set max favorite level based on model
+    this.maxFavoriteLevel = this.config.type === 'MiAirPurifier2S' ? 14 : 16;
 
     // Connect to the device
     this.connect();
@@ -100,6 +102,7 @@ class DeviceHandler {
     if (this.config.showHumidity !== false) this.setupHumiditySensor();
     if (this.config.showLED === true) this.setupLedSwitch();
     if (this.config.showBuzzer === true) this.setupBuzzerSwitch();
+    if (this.config.showChildLock !== false) this.setupChildLockSwitch();
   }
 
   async connect() {
@@ -172,12 +175,11 @@ class DeviceHandler {
       
     this.service.getCharacteristic(Characteristic.RotationSpeed)
       .onGet(async () => {
-          // HomeKit speed is 0-100, Xiaomi favorite_level is 0-17. We'll map it.
           const level = await this.getPropertyValue('favorite_level');
-          return Math.round((level / 17) * 100);
+          return Math.round((level / this.maxFavoriteLevel) * 100);
       })
       .onSet(async (value) => {
-          const level = Math.round((value / 100) * 17);
+          const level = Math.round((value / 100) * this.maxFavoriteLevel);
           await this.setPropertyValue('set_favorite_level', [level]);
       });
 
@@ -197,19 +199,11 @@ class DeviceHandler {
     service.getCharacteristic(Characteristic.AirQuality)
       .onGet(async () => {
         const aqi = await this.getPropertyValue('aqi');
-        if (aqi <= 5) {
-            return Characteristic.AirQuality.EXCELLENT;
-        } else if (aqi > 5 && aqi <= 15) {
-            return Characteristic.AirQuality.GOOD;
-        } else if (aqi > 15 && aqi <= 35) {
-            return Characteristic.AirQuality.FAIR;
-        } else if (aqi > 35 && aqi <= 55) {
-            return Characteristic.AirQuality.INFERIOR;
-        } else if (aqi > 55) {
-            return Characteristic.AirQuality.POOR;
-        } else {
-            return Characteristic.AirQuality.UNKNOWN;
-        }
+        if (aqi <= 35) return Characteristic.AirQuality.EXCELLENT;
+        if (aqi <= 75) return Characteristic.AirQuality.GOOD;
+        if (aqi <= 115) return Characteristic.AirQuality.FAIR;
+        if (aqi <= 150) return Characteristic.AirQuality.INFERIOR;
+        return Characteristic.AirQuality.POOR;
       });
       
     service.getCharacteristic(Characteristic.PM2_5Density)
@@ -233,9 +227,9 @@ class DeviceHandler {
       service.getCharacteristic(Characteristic.On)
         .onGet(async () => (await this.getPropertyValue('led')) === 'on')
         .onSet(async (value) => {
-            // Air Purifier Pro uses `set_led_b` with 0, 1, or 2. 2S uses `set_led` with `on/off`.
             if (this.config.type === 'MiAirPurifierPro') {
-                await this.setPropertyValue('set_led_b', [value ? 0 : 2]); // 0=bright, 1=dim, 2=off
+                // Pro uses `led_b` property. 0=bright, 1=dim, 2=off
+                await this.setPropertyValue('set_led_b', [value ? 0 : 2]); 
             } else {
                 await this.setPropertyValue('set_led', [value ? 'on' : 'off']);
             }
@@ -245,10 +239,14 @@ class DeviceHandler {
   setupBuzzerSwitch() {
       const service = this.accessory.getService('Buzzer') || this.accessory.addService(Service.Switch, `${this.config.name} Buzzer`, 'Buzzer');
       service.getCharacteristic(Characteristic.On)
-        .onGet(async () => {
-            const volume = await this.getPropertyValue('volume');
-            return volume > 0;
-        })
-        .onSet(async (value) => this.setPropertyValue('set_volume', [value ? 50 : 0])); // Set to a moderate volume or off
+        .onGet(async () => (await this.getPropertyValue('buzzer')) === 'on')
+        .onSet(async (value) => this.setPropertyValue('set_buzzer', [value ? 'on' : 'off']));
+  }
+  
+  setupChildLockSwitch() {
+    const service = this.accessory.getService('Child Lock') || this.accessory.addService(Service.Switch, `${this.config.name} Child Lock`, 'Child Lock');
+    service.getCharacteristic(Characteristic.On)
+      .onGet(async () => (await this.getPropertyValue('child_lock')) === 'on')
+      .onSet(async (value) => this.setPropertyValue('set_child_lock', [value ? 'on' : 'off']));
   }
 }
