@@ -22,8 +22,7 @@
             "ip": {
               "title": "IP Address",
               "type": "string",
-              "format": "ipv4",
-              "pattern": "^(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3}$"
+              "format": "ipv4"
             },
             "token": {
               "title": "Token",
@@ -79,9 +78,18 @@
               "type": "boolean",
               "default": false
             },
-            "showModeSwitches": {
-              "title": "Show Mode Control Switches (모드 제어 스위치 표시)",
-              "description": "자동, 수면, 선호 모드를 제어하는 개별 스위치를 추가합니다.",
+            "showAutoModeSwitch": {
+              "title": "Show Auto Mode Switch (자동 모드 스위치 표시)",
+              "type": "boolean",
+              "default": false
+            },
+            "showSleepModeSwitch": {
+              "title": "Show Sleep Mode Switch (수면 모드 스위치 표시)",
+              "type": "boolean",
+              "default": false
+            },
+            "showFavoriteModeSwitch": {
+              "title": "Show Favorite Mode Switch (선호 모드 스위치 표시)",
               "type": "boolean",
               "default": false
             }
@@ -108,7 +116,9 @@
         "deviceCfgs[].airQualityName",
         "deviceCfgs[].showLED",
         "deviceCfgs[].showBuzzer",
-        "deviceCfgs[].showModeSwitches"
+        "deviceCfgs[].showAutoModeSwitch",
+        "deviceCfgs[].showSleepModeSwitch",
+        "deviceCfgs[].showFavoriteModeSwitch"
       ]
     }
   ]
