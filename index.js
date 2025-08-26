@@ -83,8 +83,22 @@ class DeviceHandler {
 
     this.maxFavoriteLevel = this.config.type === 'MiAirPurifier2S' ? 14 : 16;
 
+    // Air Quality thresholds (validate or use default)
+    this.aqThresholds = this.parseAqThresholds(this.config.airQualityThresholds);
+
     this.setupServices();
     this.connect();
+  }
+
+  parseAqThresholds(arr) {
+    const def = [5, 15, 35, 55];
+    if (!Array.isArray(arr) || arr.length !== 4) return def;
+    const nums = arr.map(v => Number(v)).filter(v => Number.isFinite(v) && v >= 0);
+    if (nums.length !== 4) return def;
+    for (let i = 1; i < nums.length; i++) {
+      if (nums[i] < nums[i - 1]) return def;
+    }
+    return nums;
   }
 
   async connect() {
@@ -124,7 +138,7 @@ class DeviceHandler {
   updateAllCharacteristics() {
     // Air Purifier Service
     const airPurifierService = this.accessory.getService(Service.AirPurifier);
-    if(airPurifierService) {
+    if (airPurifierService) {
       airPurifierService.updateCharacteristic(Characteristic.Active, this.state.power === 'on' ? 1 : 0);
       airPurifierService.updateCharacteristic(Characteristic.CurrentAirPurifierState, this.state.power === 'on' ? 2 : 0);
       
@@ -140,38 +154,51 @@ class DeviceHandler {
       airPurifierService.updateCharacteristic(Characteristic.FilterChangeIndication, this.state.filter1_life < 5 ? 1 : 0);
     }
 
-    // Sensor Services
-    this.updateSensor(Service.TemperatureSensor, 'Temperature', Characteristic.CurrentTemperature, this.state.temp_dec / 10);
-    this.updateSensor(Service.HumiditySensor, 'Humidity', Characteristic.CurrentRelativeHumidity, this.state.humidity);
-    if(this.accessory.getServiceById(Service.AirQualitySensor, 'AirQuality')) {
-        let airQuality = 0;
-        if (this.state.aqi <= 35) airQuality = 1; else if (this.state.aqi <= 75) airQuality = 2; else if (this.state.aqi <= 115) airQuality = 3; else if (this.state.aqi <= 150) airQuality = 4; else airQuality = 5;
-        this.accessory.getServiceById(Service.AirQualitySensor, 'AirQuality').updateCharacteristic(Characteristic.AirQuality, airQuality);
-        this.accessory.getServiceById(Service.AirQualitySensor, 'AirQuality').updateCharacteristic(Characteristic.PM2_5Density, this.state.aqi);
+    // Sensor Services (via fixed subType IDs)
+    const tempVal = Number(this.state.temp_dec) / 10;
+    this.updateSensor(Service.TemperatureSensor, 'Temperature', Characteristic.CurrentTemperature, Number.isFinite(tempVal) ? tempVal : 0);
+    const humVal = Number(this.state.humidity);
+    this.updateSensor(Service.HumiditySensor, 'Humidity', Characteristic.CurrentRelativeHumidity, Number.isFinite(humVal) ? humVal : 0);
+
+    const aqService = this.accessory.getServiceById(Service.AirQualitySensor, 'AirQuality');
+    if (aqService) {
+      const aqi = Number(this.state.aqi);
+      const level = this.mapAqiToHomeKitLevel(aqi, this.aqThresholds);
+      aqService.updateCharacteristic(Characteristic.AirQuality, level);
+      if (Number.isFinite(aqi)) {
+        aqService.updateCharacteristic(Characteristic.PM2_5Density, aqi);
+      }
     }
     
-    // Switch Services
-    this.updateSwitch('LED', this.state.led === 'on');
-    this.updateSwitch('Buzzer', this.state.buzzer === 'on');
-    this.updateSwitch('Auto Mode', this.state.mode === 'auto');
-    this.updateSwitch('Sleep Mode', this.state.mode === 'silent');
-    this.updateSwitch('Favorite Mode', this.state.mode === 'favorite');
+    // Switch Services (via fixed subType IDs)
+    this.updateSwitchById('LED', this.state.led === 'on');
+    this.updateSwitchById('Buzzer', this.state.buzzer === 'on');
+    this.updateSwitchById('AutoMode', this.state.mode === 'auto');
+    this.updateSwitchById('SleepMode', this.state.mode === 'silent');
+    this.updateSwitchById('FavoriteMode', this.state.mode === 'favorite');
   }
   
   updateSensor(serviceType, subType, characteristic, value) {
-      const name = this.config[`${subType.toLowerCase()}Name`] || `${this.config.name} ${subType}`;
-      const service = this.accessory.getService(name);
-      if (service) {
-          service.updateCharacteristic(characteristic, value);
-      }
+    const service = this.accessory.getServiceById(serviceType, subType);
+    if (service) {
+      service.updateCharacteristic(characteristic, value);
+    }
   }
   
-  updateSwitch(name, isOn) {
-      const serviceName = `${this.config.name} ${name}`;
-      const service = this.accessory.getService(serviceName);
-      if(service) {
-          service.updateCharacteristic(Characteristic.On, isOn);
-      }
+  updateSwitchById(subType, isOn) {
+    const service = this.accessory.getServiceById(Service.Switch, subType);
+    if (service) {
+      service.updateCharacteristic(Characteristic.On, isOn);
+    }
+  }
+
+  mapAqiToHomeKitLevel(aqi, t) {
+    if (!Number.isFinite(aqi)) return Characteristic.AirQuality.UNKNOWN; // 0
+    if (aqi <= t[0]) return Characteristic.AirQuality.EXCELLENT; // 1
+    if (aqi <= t[1]) return Characteristic.AirQuality.GOOD;      // 2
+    if (aqi <= t[2]) return Characteristic.AirQuality.FAIR;      // 3
+    if (aqi <= t[3]) return Characteristic.AirQuality.INFERIOR;  // 4
+    return Characteristic.AirQuality.POOR;                        // 5
   }
 
   async setPropertyValue(method, value) {
@@ -179,7 +206,6 @@ class DeviceHandler {
     try {
       const result = await this.device.call(method, value);
       if (result[0] !== 'ok') throw new Error(`Device returned an error: ${result[0]}`);
-      // After setting a property, poll immediately for instant feedback
       setTimeout(() => this.pollDeviceState(), 250);
     } catch (e) {
       this.log.error(`Error setting property with method '${method}' on ${this.config.name}: ${e.message}`);
@@ -191,29 +217,23 @@ class DeviceHandler {
   setupServices() {
     this.setupAccessoryInfo();
     this.setupAirPurifier();
-    this.setupOrRemoveService(this.config.showTemperature !== false, Service.TemperatureSensor, 'Temperature', this.setupTemperatureSensor);
-    this.setupOrRemoveService(this.config.showHumidity !== false, Service.HumiditySensor, 'Humidity', this.setupHumiditySensor);
-    this.setupOrRemoveService(this.config.showAirQuality !== false, Service.AirQualitySensor, 'AirQuality', this.setupAirQualitySensor);
-    this.setupOrRemoveService(this.config.showLED === true, Service.Switch, 'LED', this.setupLedSwitch);
-    this.setupOrRemoveService(this.config.showBuzzer === true, Service.Switch, 'Buzzer', this.setupBuzzerSwitch);
-    this.setupOrRemoveService(this.config.showAutoModeSwitch === true, Service.Switch, 'Auto Mode', () => this.setupModeSwitch('Auto', 'auto'));
-    this.setupOrRemoveService(this.config.showSleepModeSwitch === true, Service.Switch, 'Sleep Mode', () => this.setupModeSwitch('Sleep', 'silent'));
-    this.setupOrRemoveService(this.config.showFavoriteModeSwitch === true, Service.Switch, 'Favorite Mode', () => this.setupModeSwitch('Favorite', 'favorite'));
+    this.setupOrRemoveService(this.config.showTemperature !== false, Service.TemperatureSensor, 'Temperature', () => this.setupTemperatureSensor());
+    this.setupOrRemoveService(this.config.showHumidity !== false, Service.HumiditySensor, 'Humidity', () => this.setupHumiditySensor());
+    this.setupOrRemoveService(this.config.showAirQuality !== false, Service.AirQualitySensor, 'AirQuality', () => this.setupAirQualitySensor());
+    this.setupOrRemoveService(this.config.showLED === true, Service.Switch, 'LED', () => this.setupLedSwitch());
+    this.setupOrRemoveService(this.config.showBuzzer === true, Service.Switch, 'Buzzer', () => this.setupBuzzerSwitch());
+    this.setupOrRemoveService(this.config.showAutoModeSwitch === true, Service.Switch, 'AutoMode', () => this.setupModeSwitch('AutoMode', this.config.autoModeName || `${this.config.name} Auto Mode`, 'auto'));
+    this.setupOrRemoveService(this.config.showSleepModeSwitch === true, Service.Switch, 'SleepMode', () => this.setupModeSwitch('SleepMode', this.config.sleepModeName || `${this.config.name} Sleep Mode`, 'silent'));
+    this.setupOrRemoveService(this.config.showFavoriteModeSwitch === true, Service.Switch, 'FavoriteMode', () => this.setupModeSwitch('FavoriteMode', this.config.favoriteModeName || `${this.config.name} Favorite Mode`, 'favorite'));
   }
   
-  setupOrRemoveService(condition, serviceType, subType, setupFunction) {
-      const name = `${this.config.name} ${subType}`;
-      const service = this.accessory.getService(name);
-
-      if (condition) {
-          if (!service) {
-              setupFunction.bind(this)();
-          }
-      } else {
-          if (service) {
-              this.accessory.removeService(service);
-          }
-      }
+  setupOrRemoveService(condition, serviceType, subType, setupFn) {
+    const svc = this.accessory.getServiceById(serviceType, subType);
+    if (condition) {
+      if (!svc) setupFn();
+    } else {
+      if (svc) this.accessory.removeService(svc);
+    }
   }
 
   setupAccessoryInfo() {
@@ -230,50 +250,48 @@ class DeviceHandler {
     service.getCharacteristic(Characteristic.RotationSpeed).onSet(async v => this.setPropertyValue('set_favorite_level', [Math.round((v / 100) * this.maxFavoriteLevel)]));
   }
 
+  // Sensors (display names customizable, fixed subType IDs)
   setupAirQualitySensor() {
     const name = this.config.airQualityName || `${this.config.name} Air Quality`;
     this.accessory.addService(Service.AirQualitySensor, name, 'AirQuality');
   }
-  
   setupTemperatureSensor() {
     const name = this.config.temperatureName || `${this.config.name} Temperature`;
     this.accessory.addService(Service.TemperatureSensor, name, 'Temperature');
   }
-  
   setupHumiditySensor() {
     const name = this.config.humidityName || `${this.config.name} Humidity`;
     this.accessory.addService(Service.HumiditySensor, name, 'Humidity');
   }
-  
+
+  // Switches (display names customizable, fixed subType IDs)
   setupLedSwitch() {
-    const name = `${this.config.name} LED`;
+    const name = this.config.ledName || `${this.config.name} LED`;
     const service = this.accessory.addService(Service.Switch, name, 'LED');
     service.getCharacteristic(Characteristic.On).onSet(async v => {
-        if (this.config.type === 'MiAirPurifierPro') await this.setPropertyValue('set_led_b', [v ? 0 : 2]);
-        else await this.setPropertyValue('set_led', [v ? 'on' : 'off']);
+      if (this.config.type === 'MiAirPurifierPro') await this.setPropertyValue('set_led_b', [v ? 0 : 2]);
+      else await this.setPropertyValue('set_led', [v ? 'on' : 'off']);
     });
   }
-  
+
   setupBuzzerSwitch() {
-    const name = `${this.config.name} Buzzer`;
+    const name = this.config.buzzerName || `${this.config.name} Buzzer`;
     const service = this.accessory.addService(Service.Switch, name, 'Buzzer');
     service.getCharacteristic(Characteristic.On).onSet(async v => this.setPropertyValue('set_buzzer', [v ? 'on' : 'off']));
   }
-  
-  setupModeSwitch(name, modeValue) {
-    const serviceName = `${this.config.name} ${name} Mode`;
-    const service = this.accessory.addService(Service.Switch, serviceName, `${name} Mode`);
+
+  setupModeSwitch(subType, displayName, modeValue) {
+    const service = this.accessory.addService(Service.Switch, displayName, subType);
     service.getCharacteristic(Characteristic.On).onSet(async value => {
-        if(value) {
-            this.log.info(`Activating ${name} mode for ${this.config.name}`);
-            await this.setPropertyValue('set_mode', [modeValue]);
-        } else {
-            // If user turns a mode switch OFF, revert to Auto mode.
-            if(this.state.mode === modeValue) {
-                this.log.info(`Deactivating ${name} mode, reverting to Auto for ${this.config.name}`);
-                await this.setPropertyValue('set_mode', ['auto']);
-            }
+      if (value) {
+        this.log.info(`Activating ${subType} for ${this.config.name}`);
+        await this.setPropertyValue('set_mode', [modeValue]);
+      } else {
+        if (this.state.mode === modeValue) {
+          this.log.info(`Deactivating ${subType}, reverting to Auto for ${this.config.name}`);
+          await this.setPropertyValue('set_mode', ['auto']);
         }
+      }
     });
   }
 }
