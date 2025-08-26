@@ -1,0 +1,97 @@
+{
+  "schema": {
+    "type": "object",
+    "properties": {
+      "platform": {
+        "title": "Platform",
+        "type": "string",
+        "default": "XiaomiAirPurifierPlatform",
+        "readOnly": true
+      },
+      "deviceCfgs": {
+        "title": "Devices",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string",
+              "required": true,
+              "default": "Air Purifier"
+            },
+            "ip": {
+              "title": "IP Address",
+              "type": "string",
+              "required": true,
+              "format": "ipv4"
+            },
+            "token": {
+              "title": "Token",
+              "type": "string",
+              "required": true
+            },
+            "type": {
+              "title": "Model",
+              "type": "string",
+              "required": true,
+              "oneOf": [
+                { "title": "Mi Air Purifier 2S", "enum": ["MiAirPurifier2S"] },
+                { "title": "Mi Air Purifier Pro", "enum": ["MiAirPurifierPro"] }
+              ]
+            },
+            "showTemperature": {
+              "title": "Show Temperature Sensor",
+              "type": "boolean",
+              "default": true
+            },
+            "showHumidity": {
+              "title": "Show Humidity Sensor",
+              "type": "boolean",
+              "default": true
+            },
+            "showAirQuality": {
+              "title": "Show Air Quality Sensor",
+              "type": "boolean",
+              "default": true
+            },
+            "showLED": {
+              "title": "Show LED Control Switch",
+              "type": "boolean",
+              "default": false
+            },
+            "showBuzzer": {
+              "title": "Show Buzzer Control Switch",
+              "type": "boolean",
+              "default": false
+            },
+            "showChildLock": {
+              "title": "Show Child Lock Switch",
+              "type": "boolean",
+              "default": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "layout": [
+    "platform",
+    {
+      "key": "deviceCfgs",
+      "type": "array",
+      "items": [
+        "name",
+        "ip",
+        "token",
+        "type",
+        "showTemperature",
+        "showHumidity",
+        "showAirQuality",
+        "showLED",
+        "showBuzzer",
+        "showChildLock"
+      ]
+    }
+  ]
+}
