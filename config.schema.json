@@ -14,24 +14,20 @@
             "name": {
               "title": "Name (공기청정기 이름)",
               "type": "string",
-              "required": true,
               "default": "Air Purifier"
             },
             "ip": {
               "title": "IP Address",
               "type": "string",
-              "required": true,
               "format": "ipv4"
             },
             "token": {
               "title": "Token",
-              "type": "string",
-              "required": true
+              "type": "string"
             },
             "type": {
               "title": "Model (모델)",
               "type": "string",
-              "required": true,
               "oneOf": [
                 { "title": "Mi Air Purifier 2S", "enum": ["MiAirPurifier2S"] },
                 { "title": "Mi Air Purifier Pro", "enum": ["MiAirPurifierPro"] }
@@ -83,7 +79,13 @@
               "type": "boolean",
               "default": false
             }
-          }
+          },
+          "required": [
+            "name",
+            "ip",
+            "token",
+            "type"
+          ]
         }
       }
     }
