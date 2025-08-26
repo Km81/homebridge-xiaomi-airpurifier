@@ -153,23 +153,22 @@ class DeviceHandler {
     // Switch Services
     this.updateSwitch('LED', this.state.led === 'on');
     this.updateSwitch('Buzzer', this.state.buzzer === 'on');
-    
-    if (this.config.showModeSwitches === true) {
-        this.updateSwitch('Auto Mode', this.state.mode === 'auto');
-        this.updateSwitch('Sleep Mode', this.state.mode === 'silent');
-        this.updateSwitch('Favorite Mode', this.state.mode === 'favorite');
-    }
+    this.updateSwitch('Auto Mode', this.state.mode === 'auto');
+    this.updateSwitch('Sleep Mode', this.state.mode === 'silent');
+    this.updateSwitch('Favorite Mode', this.state.mode === 'favorite');
   }
   
   updateSensor(serviceType, subType, characteristic, value) {
-      const service = this.accessory.getServiceById(serviceType, subType);
+      const name = this.config[`${subType.toLowerCase()}Name`] || `${this.config.name} ${subType}`;
+      const service = this.accessory.getService(name);
       if (service) {
           service.updateCharacteristic(characteristic, value);
       }
   }
   
   updateSwitch(name, isOn) {
-      const service = this.accessory.getService(name);
+      const serviceName = `${this.config.name} ${name}`;
+      const service = this.accessory.getService(serviceName);
       if(service) {
           service.updateCharacteristic(Characteristic.On, isOn);
       }
@@ -197,14 +196,14 @@ class DeviceHandler {
     this.setupOrRemoveService(this.config.showAirQuality !== false, Service.AirQualitySensor, 'AirQuality', this.setupAirQualitySensor);
     this.setupOrRemoveService(this.config.showLED === true, Service.Switch, 'LED', this.setupLedSwitch);
     this.setupOrRemoveService(this.config.showBuzzer === true, Service.Switch, 'Buzzer', this.setupBuzzerSwitch);
-    this.setupOrRemoveService(this.config.showModeSwitches === true, Service.Switch, 'Auto Mode', () => this.setupModeSwitch('Auto', 'auto'));
-    this.setupOrRemoveService(this.config.showModeSwitches === true, Service.Switch, 'Sleep Mode', () => this.setupModeSwitch('Sleep', 'silent'));
-    this.setupOrRemoveService(this.config.showModeSwitches === true, Service.Switch, 'Favorite Mode', () => this.setupModeSwitch('Favorite', 'favorite'));
+    this.setupOrRemoveService(this.config.showAutoModeSwitch === true, Service.Switch, 'Auto Mode', () => this.setupModeSwitch('Auto', 'auto'));
+    this.setupOrRemoveService(this.config.showSleepModeSwitch === true, Service.Switch, 'Sleep Mode', () => this.setupModeSwitch('Sleep', 'silent'));
+    this.setupOrRemoveService(this.config.showFavoriteModeSwitch === true, Service.Switch, 'Favorite Mode', () => this.setupModeSwitch('Favorite', 'favorite'));
   }
   
   setupOrRemoveService(condition, serviceType, subType, setupFunction) {
       const name = `${this.config.name} ${subType}`;
-      const service = this.accessory.getService(name) || this.accessory.getServiceById(serviceType, subType);
+      const service = this.accessory.getService(name);
 
       if (condition) {
           if (!service) {
@@ -247,7 +246,8 @@ class DeviceHandler {
   }
   
   setupLedSwitch() {
-    const service = this.accessory.addService(Service.Switch, `${this.config.name} LED`, 'LED');
+    const name = `${this.config.name} LED`;
+    const service = this.accessory.addService(Service.Switch, name, 'LED');
     service.getCharacteristic(Characteristic.On).onSet(async v => {
         if (this.config.type === 'MiAirPurifierPro') await this.setPropertyValue('set_led_b', [v ? 0 : 2]);
         else await this.setPropertyValue('set_led', [v ? 'on' : 'off']);
@@ -255,7 +255,8 @@ class DeviceHandler {
   }
   
   setupBuzzerSwitch() {
-    const service = this.accessory.addService(Service.Switch, `${this.config.name} Buzzer`, 'Buzzer');
+    const name = `${this.config.name} Buzzer`;
+    const service = this.accessory.addService(Service.Switch, name, 'Buzzer');
     service.getCharacteristic(Characteristic.On).onSet(async v => this.setPropertyValue('set_buzzer', [v ? 'on' : 'off']));
   }
   
