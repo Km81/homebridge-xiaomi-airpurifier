@@ -12,7 +12,7 @@
           "type": "object",
           "properties": {
             "name": {
-              "title": "Name",
+              "title": "Name (공기청정기 이름)",
               "type": "string",
               "required": true,
               "default": "Air Purifier"
@@ -29,7 +29,7 @@
               "required": true
             },
             "type": {
-              "title": "Model",
+              "title": "Model (모델)",
               "type": "string",
               "required": true,
               "oneOf": [
@@ -38,34 +38,50 @@
               ]
             },
             "showTemperature": {
-              "title": "Show Temperature Sensor",
+              "title": "Show Temperature Sensor (온도 센서 표시)",
               "type": "boolean",
               "default": true
+            },
+            "temperatureName": {
+              "title": "Temperature Sensor Name (온도 센서 이름)",
+              "type": "string",
+              "condition": { "functionBody": "return model.showTemperature === true" }
             },
             "showHumidity": {
-              "title": "Show Humidity Sensor",
+              "title": "Show Humidity Sensor (습도 센서 표시)",
               "type": "boolean",
               "default": true
+            },
+            "humidityName": {
+              "title": "Humidity Sensor Name (습도 센서 이름)",
+              "type": "string",
+              "condition": { "functionBody": "return model.showHumidity === true" }
             },
             "showAirQuality": {
-              "title": "Show Air Quality Sensor",
+              "title": "Show Air Quality Sensor (공기질 센서 표시)",
               "type": "boolean",
               "default": true
             },
+            "airQualityName": {
+              "title": "Air Quality Sensor Name (공기질 센서 이름)",
+              "type": "string",
+              "condition": { "functionBody": "return model.showAirQuality === true" }
+            },
             "showLED": {
-              "title": "Show LED Control Switch",
+              "title": "Show LED Control Switch (LED 제어 스위치 표시)",
               "type": "boolean",
               "default": false
             },
             "showBuzzer": {
-              "title": "Show Buzzer Control Switch",
+              "title": "Show Buzzer Control Switch (부저 제어 스위치 표시)",
               "type": "boolean",
               "default": false
             },
-            "showChildLock": {
-              "title": "Show Child Lock Switch",
+            "showModeSwitches": {
+              "title": "Show Mode Control Switches (모드 제어 스위치 표시)",
+              "description": "자동, 수면, 선호 모드를 제어하는 개별 스위치를 추가합니다.",
               "type": "boolean",
-              "default": true
+              "default": false
             }
           }
         }
@@ -83,11 +99,14 @@
         "token",
         "type",
         "showTemperature",
+        "temperatureName",
         "showHumidity",
+        "humidityName",
         "showAirQuality",
+        "airQualityName",
         "showLED",
         "showBuzzer",
-        "showChildLock"
+        "showModeSwitches"
       ]
     }
   ]
