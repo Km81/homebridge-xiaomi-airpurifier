@@ -54,26 +54,24 @@
         ]
     }
 ]
+```
 
-설정 항목 설명
-platform: 반드시 "XiaomiAirPurifierPlatform" 이어야 합니다.
+### 설정 항목 설명
 
-deviceCfgs: 사용 중인 공기청정기 기기 목록을 배열 형태로 입력합니다.
+* **platform**: 반드시 `"XiaomiAirPurifierPlatform"` 이어야 합니다.
+* **deviceCfgs**: 사용 중인 공기청정기 기기 목록을 배열 형태로 입력합니다.
+    * **type**: 기기 모델명입니다. `"MiAirPurifier2S"` 또는 `"MiAirPurifierPro"` 중 하나를 입력합니다.
+    * **ip**: 공기청정기의 고정 IP 주소입니다.
+    * **token**: 32자리 Mi Home 기기 토큰입니다.
+    * **name**: HomeKit에 표시될 액세서리 이름입니다.
+    * **showTemperature** (선택 사항, 기본값: `true`): 온도 센서를 숨기려면 `false`로 설정하세요.
+    * **showHumidity** (선택 사항, 기본값: `true`): 습도 센서를 숨기려면 `false`로 설정하세요.
+    * **showAirQuality** (선택 사항, 기본값: `true`): 공기질 센서를 숨기려면 `false`로 설정하세요.
+    * **showLED** (선택 사항, 기본값: `false`): 기기 LED 화면을 제어하는 스위치를 표시하려면 `true`로 설정하세요.
+    * **showBuzzer** (선택 사항, 기본값: `false`): 기기 부저(알림음)를 제어하는 스위치를 표시하려면 `true`로 설정하세요.
 
-type: 기기 모델명입니다. "MiAirPurifier2S" 또는 "MiAirPurifierPro" 중 하나를 입력합니다.
+---
 
-ip: 공기청정기의 고정 IP 주소입니다.
+## 토큰(Token) 추출 방법
 
-token: 32자리 Mi Home 기기 토큰입니다.
-
-name: HomeKit에 표시될 액세서리 이름입니다.
-
-showTemperature (선택 사항, 기본값: true): 온도 센서를 숨기려면 false로 설정하세요.
-
-showHumidity (선택 사항, 기본값: true): 습도 센서를 숨기려면 false로 설정하세요.
-
-showAirQuality (선택 사항, 기본값: true): 공기질 센서를 숨기려면 false로 설정하세요.
-
-showLED (선택 사항, 기본값: false): 기기 LED 화면을 제어하는 스위치를 표시하려면 true로 설정하세요.
-
-showBuzzer (선택 사항, 기본값: false): 기기 부저(알림음)를 제어하는 스위치를 표시하려면 true로 설정하세요.
+Mi Home 앱 백업에서 토큰을 추출하려면 [python-miio](https://python-miio.readthedocs.io/en/latest/discovery.html#getting-the-token) 도구나 커뮤니티에서 제공하는 다른 방법을 사용할 수 있습니다.
