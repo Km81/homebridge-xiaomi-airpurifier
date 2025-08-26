@@ -38,6 +38,7 @@
                 { "title": "Mi Air Purifier Pro", "enum": ["MiAirPurifierPro"] }
               ]
             },
+
             "showTemperature": {
               "title": "Show Temperature Sensor (온도 센서 표시)",
               "type": "boolean",
@@ -46,8 +47,9 @@
             "temperatureName": {
               "title": "Temperature Sensor Name (온도 센서 이름)",
               "type": "string",
-              "condition": { "functionBody": "return model && model.showTemperature === true;" }
+              "condition": { "key": "showTemperature", "value": true }
             },
+
             "showHumidity": {
               "title": "Show Humidity Sensor (습도 센서 표시)",
               "type": "boolean",
@@ -56,8 +58,9 @@
             "humidityName": {
               "title": "Humidity Sensor Name (습도 센서 이름)",
               "type": "string",
-              "condition": { "functionBody": "return model && model.showHumidity === true;" }
+              "condition": { "key": "showHumidity", "value": true }
             },
+
             "showAirQuality": {
               "title": "Show Air Quality Sensor (공기질 센서 표시)",
               "type": "boolean",
@@ -66,7 +69,7 @@
             "airQualityName": {
               "title": "Air Quality Sensor Name (공기질 센서 이름)",
               "type": "string",
-              "condition": { "functionBody": "return model && model.showAirQuality === true;" }
+              "condition": { "key": "showAirQuality", "value": true }
             },
             "airQualityThresholds": {
               "title": "Air Quality Thresholds (공기질 임계값 4개: 아주좋음/좋음/보통/나쁨 상한)",
@@ -79,8 +82,9 @@
                 "minimum": 0
               },
               "default": [5, 15, 35, 55],
-              "condition": { "functionBody": "return model && model.showAirQuality === true;" }
+              "condition": { "key": "showAirQuality", "value": true }
             },
+
             "showLED": {
               "title": "Show LED Control Switch (LED 제어 스위치 표시)",
               "type": "boolean",
@@ -89,8 +93,9 @@
             "ledName": {
               "title": "LED Switch Name (LED 스위치 이름)",
               "type": "string",
-              "condition": { "functionBody": "return model && model.showLED === true;" }
+              "condition": { "key": "showLED", "value": true }
             },
+
             "showBuzzer": {
               "title": "Show Buzzer Control Switch (부저 제어 스위치 표시)",
               "type": "boolean",
@@ -99,8 +104,9 @@
             "buzzerName": {
               "title": "Buzzer Switch Name (부저 스위치 이름)",
               "type": "string",
-              "condition": { "functionBody": "return model && model.showBuzzer === true;" }
+              "condition": { "key": "showBuzzer", "value": true }
             },
+
             "showAutoModeSwitch": {
               "title": "Show Auto Mode Switch (자동 모드 스위치 표시)",
               "type": "boolean",
@@ -109,8 +115,9 @@
             "autoModeName": {
               "title": "Auto Mode Switch Name (자동 모드 스위치 이름)",
               "type": "string",
-              "condition": { "functionBody": "return model && model.showAutoModeSwitch === true;" }
+              "condition": { "key": "showAutoModeSwitch", "value": true }
             },
+
             "showSleepModeSwitch": {
               "title": "Show Sleep Mode Switch (수면 모드 스위치 표시)",
               "type": "boolean",
@@ -119,8 +126,9 @@
             "sleepModeName": {
               "title": "Sleep Mode Switch Name (수면 모드 스위치 이름)",
               "type": "string",
-              "condition": { "functionBody": "return model && model.showSleepModeSwitch === true;" }
+              "condition": { "key": "showSleepModeSwitch", "value": true }
             },
+
             "showFavoriteModeSwitch": {
               "title": "Show Favorite Mode Switch (선호 모드 스위치 표시)",
               "type": "boolean",
@@ -129,7 +137,7 @@
             "favoriteModeName": {
               "title": "Favorite Mode Switch Name (선호 모드 스위치 이름)",
               "type": "string",
-              "condition": { "functionBody": "return model && model.showFavoriteModeSwitch === true;" }
+              "condition": { "key": "showFavoriteModeSwitch", "value": true }
             }
           }
         }
@@ -146,21 +154,29 @@
         "deviceCfgs[].ip",
         "deviceCfgs[].token",
         "deviceCfgs[].type",
+
         "deviceCfgs[].showTemperature",
         "deviceCfgs[].temperatureName",
+
         "deviceCfgs[].showHumidity",
         "deviceCfgs[].humidityName",
+
         "deviceCfgs[].showAirQuality",
         "deviceCfgs[].airQualityName",
         "deviceCfgs[].airQualityThresholds",
+
         "deviceCfgs[].showLED",
         "deviceCfgs[].ledName",
+
         "deviceCfgs[].showBuzzer",
         "deviceCfgs[].buzzerName",
+
         "deviceCfgs[].showAutoModeSwitch",
         "deviceCfgs[].autoModeName",
+
         "deviceCfgs[].showSleepModeSwitch",
         "deviceCfgs[].sleepModeName",
+
         "deviceCfgs[].showFavoriteModeSwitch",
         "deviceCfgs[].favoriteModeName"
       ]
