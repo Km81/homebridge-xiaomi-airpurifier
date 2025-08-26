@@ -61,7 +61,7 @@
             "showAirQuality": {
               "title": "Show Air Quality Sensor (공기질 센서 표시)",
               "type": "boolean",
-              "default": true"
+              "default": true
             },
             "airQualityName": {
               "title": "Air Quality Sensor Name (공기질 센서 이름)",
