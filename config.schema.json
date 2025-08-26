@@ -25,16 +25,22 @@
                 { "title": "Mi Air Purifier Pro", "enum": ["MiAirPurifierPro"] }
               ]
             },
+            "serialNumber": {
+              "title": "Serial Number (일련번호)",
+              "type": "string",
+              "description": "HomeKit 액세서리 정보에 표시될 일련번호 (미입력 시 IP 사용)"
+            },
 
             "showTemperature": { "title": "Show Temperature Sensor (온도 센서 표시)", "type": "boolean", "default": true },
-            "temperatureName": { "title": "Temperature Sensor Name (온도 센서 이름)", "type": "string", "condition": { "key": "showTemperature", "value": true } },
             "separateTemperatureAccessory": { "title": "Separate Temperature Accessory (온도 별도 악세서리)", "type": "boolean", "default": false, "condition": { "key": "showTemperature", "value": true } },
+            "temperatureName": { "title": "Temperature Sensor Name (온도 센서 이름)", "type": "string", "condition": { "key": "showTemperature", "value": true } },
 
             "showHumidity": { "title": "Show Humidity Sensor (습도 센서 표시)", "type": "boolean", "default": true },
-            "humidityName": { "title": "Humidity Sensor Name (습도 센서 이름)", "type": "string", "condition": { "key": "showHumidity", "value": true } },
             "separateHumidityAccessory": { "title": "Separate Humidity Accessory (습도 별도 악세서리)", "type": "boolean", "default": false, "condition": { "key": "showHumidity", "value": true } },
+            "humidityName": { "title": "Humidity Sensor Name (습도 센서 이름)", "type": "string", "condition": { "key": "showHumidity", "value": true } },
 
             "showAirQuality": { "title": "Show Air Quality Sensor (공기질 센서 표시)", "type": "boolean", "default": true },
+            "separateAirQualityAccessory": { "title": "Separate Air Quality Accessory (공기질 별도 악세서리)", "type": "boolean", "default": false, "condition": { "key": "showAirQuality", "value": true } },
             "airQualityName": { "title": "Air Quality Sensor Name (공기질 센서 이름)", "type": "string", "condition": { "key": "showAirQuality", "value": true } },
             "airQualityThresholds": {
               "title": "Air Quality Thresholds (공기질 임계값 4개: 아주좋음/좋음/보통/나쁨 상한)",
@@ -49,27 +55,26 @@
               "required": ["t1", "t2", "t3", "t4"],
               "condition": { "key": "showAirQuality", "value": true }
             },
-            "separateAirQualityAccessory": { "title": "Separate Air Quality Accessory (공기질 별도 악세서리)", "type": "boolean", "default": false, "condition": { "key": "showAirQuality", "value": true } },
 
             "showLED": { "title": "Show LED Control Switch (LED 제어 스위치 표시)", "type": "boolean", "default": false },
-            "ledName": { "title": "LED Switch Name (LED 스위치 이름)", "type": "string", "condition": { "key": "showLED", "value": true } },
             "separateLedAccessory": { "title": "Separate LED Accessory (LED 별도 악세서리)", "type": "boolean", "default": false, "condition": { "key": "showLED", "value": true } },
+            "ledName": { "title": "LED Switch Name (LED 스위치 이름)", "type": "string", "condition": { "key": "showLED", "value": true } },
 
             "showBuzzer": { "title": "Show Buzzer Control Switch (부저 제어 스위치 표시)", "type": "boolean", "default": false },
-            "buzzerName": { "title": "Buzzer Switch Name (부저 스위치 이름)", "type": "string", "condition": { "key": "showBuzzer", "value": true } },
             "separateBuzzerAccessory": { "title": "Separate Buzzer Accessory (부저 별도 악세서리)", "type": "boolean", "default": false, "condition": { "key": "showBuzzer", "value": true } },
+            "buzzerName": { "title": "Buzzer Switch Name (부저 스위치 이름)", "type": "string", "condition": { "key": "showBuzzer", "value": true } },
 
             "showAutoModeSwitch": { "title": "Show Auto Mode Switch (자동 모드 스위치 표시)", "type": "boolean", "default": false },
-            "autoModeName": { "title": "Auto Mode Switch Name (자동 모드 스위치 이름)", "type": "string", "condition": { "key": "showAutoModeSwitch", "value": true } },
             "separateAutoModeAccessory": { "title": "Separate Auto Mode Accessory (자동 모드 별도 악세서리)", "type": "boolean", "default": false, "condition": { "key": "showAutoModeSwitch", "value": true } },
+            "autoModeName": { "title": "Auto Mode Switch Name (자동 모드 스위치 이름)", "type": "string", "condition": { "key": "showAutoModeSwitch", "value": true } },
 
             "showSleepModeSwitch": { "title": "Show Sleep Mode Switch (수면 모드 스위치 표시)", "type": "boolean", "default": false },
-            "sleepModeName": { "title": "Sleep Mode Switch Name (수면 모드 스위치 이름)", "type": "string", "condition": { "key": "showSleepModeSwitch", "value": true } },
             "separateSleepModeAccessory": { "title": "Separate Sleep Mode Accessory (수면 모드 별도 악세서리)", "type": "boolean", "default": false, "condition": { "key": "showSleepModeSwitch", "value": true } },
+            "sleepModeName": { "title": "Sleep Mode Switch Name (수면 모드 스위치 이름)", "type": "string", "condition": { "key": "showSleepModeSwitch", "value": true } },
 
             "showFavoriteModeSwitch": { "title": "Show Favorite Mode Switch (선호 모드 스위치 표시)", "type": "boolean", "default": false },
-            "favoriteModeName": { "title": "Favorite Mode Switch Name (선호 모드 스위치 이름)", "type": "string", "condition": { "key": "showFavoriteModeSwitch", "value": true } },
-            "separateFavoriteModeAccessory": { "title": "Separate Favorite Mode Accessory (선호 모드 별도 악세서리)", "type": "boolean", "default": false, "condition": { "key": "showFavoriteModeSwitch", "value": true } }
+            "separateFavoriteModeAccessory": { "title": "Separate Favorite Mode Accessory (선호 모드 별도 악세서리)", "type": "boolean", "default": false, "condition": { "key": "showFavoriteModeSwitch", "value": true } },
+            "favoriteModeName": { "title": "Favorite Mode Switch Name (선호 모드 스위치 이름)", "type": "string", "condition": { "key": "showFavoriteModeSwitch", "value": true } }
           }
         }
       }
@@ -85,42 +90,43 @@
         "deviceCfgs[].ip",
         "deviceCfgs[].token",
         "deviceCfgs[].type",
+        "deviceCfgs[].serialNumber",
 
         "deviceCfgs[].showTemperature",
-        "deviceCfgs[].temperatureName",
         "deviceCfgs[].separateTemperatureAccessory",
+        "deviceCfgs[].temperatureName",
 
         "deviceCfgs[].showHumidity",
-        "deviceCfgs[].humidityName",
         "deviceCfgs[].separateHumidityAccessory",
+        "deviceCfgs[].humidityName",
 
         "deviceCfgs[].showAirQuality",
+        "deviceCfgs[].separateAirQualityAccessory",
         "deviceCfgs[].airQualityName",
         "deviceCfgs[].airQualityThresholds.t1",
         "deviceCfgs[].airQualityThresholds.t2",
         "deviceCfgs[].airQualityThresholds.t3",
         "deviceCfgs[].airQualityThresholds.t4",
-        "deviceCfgs[].separateAirQualityAccessory",
 
         "deviceCfgs[].showLED",
-        "deviceCfgs[].ledName",
         "deviceCfgs[].separateLedAccessory",
+        "deviceCfgs[].ledName",
 
         "deviceCfgs[].showBuzzer",
-        "deviceCfgs[].buzzerName",
         "deviceCfgs[].separateBuzzerAccessory",
+        "deviceCfgs[].buzzerName",
 
         "deviceCfgs[].showAutoModeSwitch",
-        "deviceCfgs[].autoModeName",
         "deviceCfgs[].separateAutoModeAccessory",
+        "deviceCfgs[].autoModeName",
 
         "deviceCfgs[].showSleepModeSwitch",
-        "deviceCfgs[].sleepModeName",
         "deviceCfgs[].separateSleepModeAccessory",
+        "deviceCfgs[].sleepModeName",
 
         "deviceCfgs[].showFavoriteModeSwitch",
-        "deviceCfgs[].favoriteModeName",
-        "deviceCfgs[].separateFavoriteModeAccessory"
+        "deviceCfgs[].separateFavoriteModeAccessory",
+        "deviceCfgs[].favoriteModeName"
       ]
     }
   ]
