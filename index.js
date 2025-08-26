@@ -1,3 +1,4 @@
+// index.js
 const miio = require('miio');
 const packageJson = require('./package.json');
 
@@ -18,7 +19,7 @@ module.exports = (api) => {
 class XiaomiAirPurifierPlatform {
   constructor(log, config, api) {
     this.log = log;
-    this.config = config;
+    this.config = config || {};
     this.api = api;
     this.accessories = [];
     this.log.info(`Initializing Xiaomi Air Purifier platform v${packageJson.version}`);
@@ -35,10 +36,11 @@ class XiaomiAirPurifierPlatform {
     const foundAccessories = new Set();
 
     for (const deviceConfig of configuredDevices) {
-      if (!deviceConfig.ip || !deviceConfig.token || !deviceConfig.name || !deviceConfig.type) {
+      if (!deviceConfig || !deviceConfig.ip || !deviceConfig.token || !deviceConfig.name || !deviceConfig.type) {
         this.log.warn('A device in your configuration is missing ip, token, name, or type. Skipping.');
         continue;
       }
+
       const supportedModels = ['MiAirPurifier2S', 'MiAirPurifierPro'];
       if (!supportedModels.includes(deviceConfig.type)) {
         this.log.warn(`Device type '${deviceConfig.type}' is not supported by this plugin. Skipping.`);
@@ -46,7 +48,7 @@ class XiaomiAirPurifierPlatform {
       }
 
       const uuid = UUIDGen.generate(deviceConfig.ip);
-      const existingAccessory = this.accessories.find(acc => acc.UUID === uuid);
+      const existingAccessory = this.accessories.find((acc) => acc.UUID === uuid);
 
       if (existingAccessory) {
         this.log.info(`Restoring existing accessory: ${existingAccessory.displayName}`);
@@ -62,8 +64,8 @@ class XiaomiAirPurifierPlatform {
         foundAccessories.add(accessory.UUID);
       }
     }
-    
-    const accessoriesToUnregister = this.accessories.filter(acc => !foundAccessories.has(acc.UUID));
+
+    const accessoriesToUnregister = this.accessories.filter((acc) => !foundAccessories.has(acc.UUID));
     if (accessoriesToUnregister.length > 0) {
       this.log.info(`Unregistering ${accessoriesToUnregister.length} stale accessories.`);
       this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, accessoriesToUnregister);
@@ -76,7 +78,7 @@ class DeviceHandler {
     this.platform = platform;
     this.log = platform.log;
     this.accessory = accessory;
-    this.config = accessory.context.device;
+    this.config = accessory.context.device || {};
     this.device = null;
     this.state = {}; // Cached device state
     this.pollInterval = null;
@@ -90,23 +92,56 @@ class DeviceHandler {
     this.connect();
   }
 
-  parseAqThresholds(arr) {
+  // -------- Helpers --------
+  parseAqThresholds(conf) {
     const def = [5, 15, 35, 55];
-    if (!Array.isArray(arr) || arr.length !== 4) return def;
-    const nums = arr.map(v => Number(v)).filter(v => Number.isFinite(v) && v >= 0);
-    if (nums.length !== 4) return def;
-    for (let i = 1; i < nums.length; i++) {
-      if (nums[i] < nums[i - 1]) return def;
+
+    // 1) object 형태 {t1,t2,t3,t4}
+    if (conf && typeof conf === 'object' && !Array.isArray(conf)) {
+      const cand = [conf.t1, conf.t2, conf.t3, conf.t4].map((v) => Number(v));
+      if (cand.every((v) => Number.isFinite(v) && v >= 0)) {
+        if (cand[0] <= cand[1] && cand[1] <= cand[2] && cand[2] <= cand[3]) return cand;
+      }
     }
-    return nums;
+
+    // 2) array 형태 [n1,n2,n3,n4]
+    if (Array.isArray(conf) && conf.length === 4) {
+      const cand = conf.map((v) => Number(v));
+      if (cand.every((v) => Number.isFinite(v) && v >= 0)) {
+        if (cand[0] <= cand[1] && cand[1] <= cand[2] && cand[2] <= cand[3]) return cand;
+      }
+    }
+
+    return def;
   }
 
+  mapAqiToHomeKitLevel(aqi, t) {
+    if (!Number.isFinite(aqi)) return Characteristic.AirQuality.UNKNOWN; // 0
+    if (aqi <= t[0]) return Characteristic.AirQuality.EXCELLENT; // 1
+    if (aqi <= t[1]) return Characteristic.AirQuality.GOOD; // 2
+    if (aqi <= t[2]) return Characteristic.AirQuality.FAIR; // 3
+    if (aqi <= t[3]) return Characteristic.AirQuality.INFERIOR; // 4
+    return Characteristic.AirQuality.POOR; // 5
+  }
+
+  setServiceName(service, name) {
+    try {
+      service.updateCharacteristic(Characteristic.Name, name);
+    } catch (_) {}
+    try {
+      if (Characteristic.ConfiguredName) {
+        service.updateCharacteristic(Characteristic.ConfiguredName, name);
+      }
+    } catch (_) {}
+  }
+
+  // -------- Device I/O --------
   async connect() {
     try {
       this.log.info(`Connecting to ${this.config.name} at ${this.config.ip}...`);
       this.device = await miio.device({ address: this.config.ip, token: this.config.token });
       this.log.info(`Successfully connected to ${this.config.name}.`);
-      
+
       clearInterval(this.pollInterval);
       this.pollDeviceState(); // Poll immediately
       this.pollInterval = setInterval(() => this.pollDeviceState(), POLLING_INTERVAL);
@@ -120,11 +155,18 @@ class DeviceHandler {
     if (!this.device) return;
     try {
       const props = [
-        'power', 'mode', 'aqi', 'temp_dec', 
-        'humidity', 'filter1_life', 'favorite_level', 'led', 'buzzer'
+        'power',
+        'mode',
+        'aqi',
+        'temp_dec',
+        'humidity',
+        'filter1_life',
+        'favorite_level',
+        'led',
+        'buzzer',
       ];
       const values = await this.device.call('get_prop', props);
-      
+
       props.forEach((prop, i) => {
         this.state[prop] = values[i];
       });
@@ -135,77 +177,13 @@ class DeviceHandler {
     }
   }
 
-  updateAllCharacteristics() {
-    // Air Purifier Service
-    const airPurifierService = this.accessory.getService(Service.AirPurifier);
-    if (airPurifierService) {
-      airPurifierService.updateCharacteristic(Characteristic.Active, this.state.power === 'on' ? 1 : 0);
-      airPurifierService.updateCharacteristic(Characteristic.CurrentAirPurifierState, this.state.power === 'on' ? 2 : 0);
-      
-      let targetState = Characteristic.TargetAirPurifierState.AUTO;
-      if (this.state.mode === 'favorite' || this.state.mode === 'silent') {
-        targetState = Characteristic.TargetAirPurifierState.MANUAL;
-      }
-      airPurifierService.updateCharacteristic(Characteristic.TargetAirPurifierState, targetState);
-      
-      const speed = Math.round((this.state.favorite_level / this.maxFavoriteLevel) * 100);
-      airPurifierService.updateCharacteristic(Characteristic.RotationSpeed, speed);
-      airPurifierService.updateCharacteristic(Characteristic.FilterLifeLevel, this.state.filter1_life);
-      airPurifierService.updateCharacteristic(Characteristic.FilterChangeIndication, this.state.filter1_life < 5 ? 1 : 0);
-    }
-
-    // Sensor Services (via fixed subType IDs)
-    const tempVal = Number(this.state.temp_dec) / 10;
-    this.updateSensor(Service.TemperatureSensor, 'Temperature', Characteristic.CurrentTemperature, Number.isFinite(tempVal) ? tempVal : 0);
-    const humVal = Number(this.state.humidity);
-    this.updateSensor(Service.HumiditySensor, 'Humidity', Characteristic.CurrentRelativeHumidity, Number.isFinite(humVal) ? humVal : 0);
-
-    const aqService = this.accessory.getServiceById(Service.AirQualitySensor, 'AirQuality');
-    if (aqService) {
-      const aqi = Number(this.state.aqi);
-      const level = this.mapAqiToHomeKitLevel(aqi, this.aqThresholds);
-      aqService.updateCharacteristic(Characteristic.AirQuality, level);
-      if (Number.isFinite(aqi)) {
-        aqService.updateCharacteristic(Characteristic.PM2_5Density, aqi);
-      }
-    }
-    
-    // Switch Services (via fixed subType IDs)
-    this.updateSwitchById('LED', this.state.led === 'on');
-    this.updateSwitchById('Buzzer', this.state.buzzer === 'on');
-    this.updateSwitchById('AutoMode', this.state.mode === 'auto');
-    this.updateSwitchById('SleepMode', this.state.mode === 'silent');
-    this.updateSwitchById('FavoriteMode', this.state.mode === 'favorite');
-  }
-  
-  updateSensor(serviceType, subType, characteristic, value) {
-    const service = this.accessory.getServiceById(serviceType, subType);
-    if (service) {
-      service.updateCharacteristic(characteristic, value);
-    }
-  }
-  
-  updateSwitchById(subType, isOn) {
-    const service = this.accessory.getServiceById(Service.Switch, subType);
-    if (service) {
-      service.updateCharacteristic(Characteristic.On, isOn);
-    }
-  }
-
-  mapAqiToHomeKitLevel(aqi, t) {
-    if (!Number.isFinite(aqi)) return Characteristic.AirQuality.UNKNOWN; // 0
-    if (aqi <= t[0]) return Characteristic.AirQuality.EXCELLENT; // 1
-    if (aqi <= t[1]) return Characteristic.AirQuality.GOOD;      // 2
-    if (aqi <= t[2]) return Characteristic.AirQuality.FAIR;      // 3
-    if (aqi <= t[3]) return Characteristic.AirQuality.INFERIOR;  // 4
-    return Characteristic.AirQuality.POOR;                        // 5
-  }
-
   async setPropertyValue(method, value) {
     if (!this.device) throw new Error('Device not connected');
     try {
       const result = await this.device.call(method, value);
-      if (result[0] !== 'ok') throw new Error(`Device returned an error: ${result[0]}`);
+      if (!Array.isArray(result) || result[0] !== 'ok') {
+        throw new Error(`Device returned an error: ${Array.isArray(result) ? result[0] : String(result)}`);
+      }
       setTimeout(() => this.pollDeviceState(), 250);
     } catch (e) {
       this.log.error(`Error setting property with method '${method}' on ${this.config.name}: ${e.message}`);
@@ -214,61 +192,139 @@ class DeviceHandler {
     }
   }
 
+  // -------- Services: create/update --------
   setupServices() {
     this.setupAccessoryInfo();
     this.setupAirPurifier();
-    this.setupOrRemoveService(this.config.showTemperature !== false, Service.TemperatureSensor, 'Temperature', () => this.setupTemperatureSensor());
-    this.setupOrRemoveService(this.config.showHumidity !== false, Service.HumiditySensor, 'Humidity', () => this.setupHumiditySensor());
-    this.setupOrRemoveService(this.config.showAirQuality !== false, Service.AirQualitySensor, 'AirQuality', () => this.setupAirQualitySensor());
+
+    this.setupOrRemoveService(
+      this.config.showTemperature !== false,
+      Service.TemperatureSensor,
+      'Temperature',
+      () => this.setupTemperatureSensor(),
+    );
+    this.setupOrRemoveService(
+      this.config.showHumidity !== false,
+      Service.HumiditySensor,
+      'Humidity',
+      () => this.setupHumiditySensor(),
+    );
+    this.setupOrRemoveService(
+      this.config.showAirQuality !== false,
+      Service.AirQualitySensor,
+      'AirQuality',
+      () => this.setupAirQualitySensor(),
+    );
+
     this.setupOrRemoveService(this.config.showLED === true, Service.Switch, 'LED', () => this.setupLedSwitch());
-    this.setupOrRemoveService(this.config.showBuzzer === true, Service.Switch, 'Buzzer', () => this.setupBuzzerSwitch());
-    this.setupOrRemoveService(this.config.showAutoModeSwitch === true, Service.Switch, 'AutoMode', () => this.setupModeSwitch('AutoMode', this.config.autoModeName || `${this.config.name} Auto Mode`, 'auto'));
-    this.setupOrRemoveService(this.config.showSleepModeSwitch === true, Service.Switch, 'SleepMode', () => this.setupModeSwitch('SleepMode', this.config.sleepModeName || `${this.config.name} Sleep Mode`, 'silent'));
-    this.setupOrRemoveService(this.config.showFavoriteModeSwitch === true, Service.Switch, 'FavoriteMode', () => this.setupModeSwitch('FavoriteMode', this.config.favoriteModeName || `${this.config.name} Favorite Mode`, 'favorite'));
+    this.setupOrRemoveService(
+      this.config.showBuzzer === true,
+      Service.Switch,
+      'Buzzer',
+      () => this.setupBuzzerSwitch(),
+    );
+
+    this.setupOrRemoveService(
+      this.config.showAutoModeSwitch === true,
+      Service.Switch,
+      'AutoMode',
+      () => this.setupModeSwitch('AutoMode', this.config.autoModeName || `${this.config.name} Auto Mode`, 'auto'),
+    );
+    this.setupOrRemoveService(
+      this.config.showSleepModeSwitch === true,
+      Service.Switch,
+      'SleepMode',
+      () =>
+        this.setupModeSwitch('SleepMode', this.config.sleepModeName || `${this.config.name} Sleep Mode`, 'silent'),
+    );
+    this.setupOrRemoveService(
+      this.config.showFavoriteModeSwitch === true,
+      Service.Switch,
+      'FavoriteMode',
+      () =>
+        this.setupModeSwitch(
+          'FavoriteMode',
+          this.config.favoriteModeName || `${this.config.name} Favorite Mode`,
+          'favorite',
+        ),
+    );
   }
-  
+
   setupOrRemoveService(condition, serviceType, subType, setupFn) {
     const svc = this.accessory.getServiceById(serviceType, subType);
     if (condition) {
       if (!svc) setupFn();
+      else {
+        // 이름 변경이 있었을 수 있으니 한 번 더 이름 적용
+        const currentName =
+          (subType === 'AirQuality' && (this.config.airQualityName || `${this.config.name} Air Quality`)) ||
+          (subType === 'Temperature' && (this.config.temperatureName || `${this.config.name} Temperature`)) ||
+          (subType === 'Humidity' && (this.config.humidityName || `${this.config.name} Humidity`)) ||
+          (subType === 'LED' && (this.config.ledName || `${this.config.name} LED`)) ||
+          (subType === 'Buzzer' && (this.config.buzzerName || `${this.config.name} Buzzer`)) ||
+          (subType === 'AutoMode' && (this.config.autoModeName || `${this.config.name} Auto Mode`)) ||
+          (subType === 'SleepMode' && (this.config.sleepModeName || `${this.config.name} Sleep Mode`)) ||
+          (subType === 'FavoriteMode' && (this.config.favoriteModeName || `${this.config.name} Favorite Mode`)) ||
+          null;
+        if (currentName) this.setServiceName(svc, currentName);
+      }
     } else {
       if (svc) this.accessory.removeService(svc);
     }
   }
 
   setupAccessoryInfo() {
-    this.accessory.getService(Service.AccessoryInformation)
+    this.accessory
+      .getService(Service.AccessoryInformation)
       .setCharacteristic(Characteristic.Manufacturer, 'Xiaomi')
-      .setCharacteristic(Characteristic.Model, this.config.type)
-      .setCharacteristic(Characteristic.SerialNumber, this.config.ip);
+      .setCharacteristic(Characteristic.Model, this.config.type || 'Unknown')
+      .setCharacteristic(Characteristic.SerialNumber, this.config.ip || 'Unknown');
   }
 
   setupAirPurifier() {
-    const service = this.accessory.getService(Service.AirPurifier) || this.accessory.addService(Service.AirPurifier, this.config.name);
-    service.getCharacteristic(Characteristic.Active).onSet(async v => this.setPropertyValue('set_power', [v ? 'on' : 'off']));
-    service.getCharacteristic(Characteristic.TargetAirPurifierState).onSet(async v => this.setPropertyValue('set_mode', [v === 0 ? 'auto' : 'favorite']));
-    service.getCharacteristic(Characteristic.RotationSpeed).onSet(async v => this.setPropertyValue('set_favorite_level', [Math.round((v / 100) * this.maxFavoriteLevel)]));
+    const service =
+      this.accessory.getService(Service.AirPurifier) ||
+      this.accessory.addService(Service.AirPurifier, this.config.name);
+    this.setServiceName(service, this.config.name);
+
+    service
+      .getCharacteristic(Characteristic.Active)
+      .onSet(async (v) => this.setPropertyValue('set_power', [v ? 'on' : 'off']));
+    service
+      .getCharacteristic(Characteristic.TargetAirPurifierState)
+      .onSet(async (v) => this.setPropertyValue('set_mode', [v === 0 ? 'auto' : 'favorite']));
+    service
+      .getCharacteristic(Characteristic.RotationSpeed)
+      .onSet(async (v) =>
+        this.setPropertyValue('set_favorite_level', [Math.round((Number(v) / 100) * this.maxFavoriteLevel)]),
+      );
   }
 
-  // Sensors (display names customizable, fixed subType IDs)
+  // ---- Sensors (display names customizable, fixed subType IDs) ----
   setupAirQualitySensor() {
     const name = this.config.airQualityName || `${this.config.name} Air Quality`;
-    this.accessory.addService(Service.AirQualitySensor, name, 'AirQuality');
-  }
-  setupTemperatureSensor() {
-    const name = this.config.temperatureName || `${this.config.name} Temperature`;
-    this.accessory.addService(Service.TemperatureSensor, name, 'Temperature');
-  }
-  setupHumiditySensor() {
-    const name = this.config.humidityName || `${this.config.name} Humidity`;
-    this.accessory.addService(Service.HumiditySensor, name, 'Humidity');
+    const service = this.accessory.addService(Service.AirQualitySensor, name, 'AirQuality');
+    this.setServiceName(service, name);
   }
 
-  // Switches (display names customizable, fixed subType IDs)
+  setupTemperatureSensor() {
+    const name = this.config.temperatureName || `${this.config.name} Temperature`;
+    const service = this.accessory.addService(Service.TemperatureSensor, name, 'Temperature');
+    this.setServiceName(service, name);
+  }
+
+  setupHumiditySensor() {
+    const name = this.config.humidityName || `${this.config.name} Humidity`;
+    const service = this.accessory.addService(Service.HumiditySensor, name, 'Humidity');
+    this.setServiceName(service, name);
+  }
+
+  // ---- Switches (display names customizable, fixed subType IDs) ----
   setupLedSwitch() {
     const name = this.config.ledName || `${this.config.name} LED`;
     const service = this.accessory.addService(Service.Switch, name, 'LED');
-    service.getCharacteristic(Characteristic.On).onSet(async v => {
+    this.setServiceName(service, name);
+    service.getCharacteristic(Characteristic.On).onSet(async (v) => {
       if (this.config.type === 'MiAirPurifierPro') await this.setPropertyValue('set_led_b', [v ? 0 : 2]);
       else await this.setPropertyValue('set_led', [v ? 'on' : 'off']);
     });
@@ -277,12 +333,16 @@ class DeviceHandler {
   setupBuzzerSwitch() {
     const name = this.config.buzzerName || `${this.config.name} Buzzer`;
     const service = this.accessory.addService(Service.Switch, name, 'Buzzer');
-    service.getCharacteristic(Characteristic.On).onSet(async v => this.setPropertyValue('set_buzzer', [v ? 'on' : 'off']));
+    this.setServiceName(service, name);
+    service.getCharacteristic(Characteristic.On).onSet(async (v) => {
+      await this.setPropertyValue('set_buzzer', [v ? 'on' : 'off']);
+    });
   }
 
   setupModeSwitch(subType, displayName, modeValue) {
     const service = this.accessory.addService(Service.Switch, displayName, subType);
-    service.getCharacteristic(Characteristic.On).onSet(async value => {
+    this.setServiceName(service, displayName);
+    service.getCharacteristic(Characteristic.On).onSet(async (value) => {
       if (value) {
         this.log.info(`Activating ${subType} for ${this.config.name}`);
         await this.setPropertyValue('set_mode', [modeValue]);
@@ -293,5 +353,75 @@ class DeviceHandler {
         }
       }
     });
+  }
+
+  // -------- Periodic updates --------
+  updateAllCharacteristics() {
+    // Air Purifier
+    const svcAp = this.accessory.getService(Service.AirPurifier);
+    if (svcAp) {
+      const powerOn = this.state.power === 'on';
+      svcAp.updateCharacteristic(Characteristic.Active, powerOn ? 1 : 0);
+      svcAp.updateCharacteristic(
+        Characteristic.CurrentAirPurifierState,
+        powerOn ? Characteristic.CurrentAirPurifierState.PURIFYING_AIR : Characteristic.CurrentAirPurifierState.INACTIVE,
+      );
+
+      let targetState = Characteristic.TargetAirPurifierState.AUTO;
+      if (this.state.mode === 'favorite' || this.state.mode === 'silent') {
+        targetState = Characteristic.TargetAirPurifierState.MANUAL;
+      }
+      svcAp.updateCharacteristic(Characteristic.TargetAirPurifierState, targetState);
+
+      const fav = Number(this.state.favorite_level);
+      const speed = Number.isFinite(fav) ? Math.max(0, Math.min(100, Math.round((fav / this.maxFavoriteLevel) * 100))) : 0;
+      svcAp.updateCharacteristic(Characteristic.RotationSpeed, speed);
+
+      const life = Number(this.state.filter1_life);
+      if (Number.isFinite(life)) {
+        svcAp.updateCharacteristic(Characteristic.FilterLifeLevel, life);
+        svcAp.updateCharacteristic(Characteristic.FilterChangeIndication, life < 5 ? 1 : 0);
+      }
+    }
+
+    // Sensors
+    const tSvc = this.accessory.getServiceById(Service.TemperatureSensor, 'Temperature');
+    if (tSvc) {
+      const temp = Number(this.state.temp_dec);
+      const tempC = Number.isFinite(temp) ? temp / 10 : 0;
+      tSvc.updateCharacteristic(Characteristic.CurrentTemperature, tempC);
+    }
+
+    const hSvc = this.accessory.getServiceById(Service.HumiditySensor, 'Humidity');
+    if (hSvc) {
+      const hum = Number(this.state.humidity);
+      hSvc.updateCharacteristic(Characteristic.CurrentRelativeHumidity, Number.isFinite(hum) ? hum : 0);
+    }
+
+    const aqSvc = this.accessory.getServiceById(Service.AirQualitySensor, 'AirQuality');
+    if (aqSvc) {
+      const aqi = Number(this.state.aqi);
+      const level = this.mapAqiToHomeKitLevel(aqi, this.aqThresholds);
+      aqSvc.updateCharacteristic(Characteristic.AirQuality, level);
+      if (Number.isFinite(aqi)) {
+        aqSvc.updateCharacteristic(Characteristic.PM2_5Density, aqi);
+      }
+    }
+
+    // Switches
+    const ledSvc = this.accessory.getServiceById(Service.Switch, 'LED');
+    if (ledSvc) ledSvc.updateCharacteristic(Characteristic.On, this.state.led === 'on');
+
+    const buzSvc = this.accessory.getServiceById(Service.Switch, 'Buzzer');
+    if (buzSvc) buzSvc.updateCharacteristic(Characteristic.On, this.state.buzzer === 'on');
+
+    const autoSvc = this.accessory.getServiceById(Service.Switch, 'AutoMode');
+    if (autoSvc) autoSvc.updateCharacteristic(Characteristic.On, this.state.mode === 'auto');
+
+    const sleepSvc = this.accessory.getServiceById(Service.Switch, 'SleepMode');
+    if (sleepSvc) sleepSvc.updateCharacteristic(Characteristic.On, this.state.mode === 'silent');
+
+    const favSvc = this.accessory.getServiceById(Service.Switch, 'FavoriteMode');
+    if (favSvc) favSvc.updateCharacteristic(Characteristic.On, this.state.mode === 'favorite');
   }
 }
