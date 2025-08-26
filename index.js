@@ -32,7 +32,8 @@ class XiaomiAirPurifierPlatform {
 
   discoverDevices() {
     const configuredDevices = this.config.deviceCfgs || [];
-    const foundAccessories = new Set();
+    // "메인 악세서리"만 추적 (자식은 제거 대상에서 제외)
+    const foundMainUUIDs = new Set();
 
     for (const deviceConfig of configuredDevices) {
       if (!deviceConfig || !deviceConfig.ip || !deviceConfig.token || !deviceConfig.name || !deviceConfig.type) {
@@ -52,22 +53,29 @@ class XiaomiAirPurifierPlatform {
       if (existingAccessory) {
         this.log.info(`[샤오미 공기청정기] 기존 악세서리 복원: ${existingAccessory.displayName}`);
         existingAccessory.context.device = deviceConfig;
+        existingAccessory.context.isChild = false; // 메인 표시
         new DeviceHandler(this, existingAccessory);
-        foundAccessories.add(existingAccessory.UUID);
+        foundMainUUIDs.add(existingAccessory.UUID);
       } else {
         this.log.info(`[샤오미 공기청정기] 새 악세서리 추가: ${deviceConfig.name}`);
         const accessory = new PlatformAccessory(deviceConfig.name, uuid);
         accessory.context.device = deviceConfig;
+        accessory.context.isChild = false; // 메인 표시
         new DeviceHandler(this, accessory);
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
-        foundAccessories.add(accessory.UUID);
+        this.accessories.push(accessory); // 새로 만든 것도 내부 배열에 넣어줌
+        foundMainUUIDs.add(accessory.UUID);
       }
     }
 
-    const accessoriesToUnregister = this.accessories.filter((acc) => !foundAccessories.has(acc.UUID));
+    // ⚠️ 캐시 정리: 메인 악세서리만 대상. 자식(acc.context.isChild===true)은 유지!
+    const accessoriesToUnregister = this.accessories.filter(
+      (acc) => acc.context?.isChild !== true && !foundMainUUIDs.has(acc.UUID)
+    );
     if (accessoriesToUnregister.length > 0) {
-      this.log.info(`[샤오미 공기청정기] 사용하지 않는 악세서리 ${accessoriesToUnregister.length}개 등록 해제`);
+      this.log.info(`[샤오미 공기청정기] 사용하지 않는 메인 악세서리 ${accessoriesToUnregister.length}개 등록 해제`);
       this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, accessoriesToUnregister);
+      this.accessories = this.accessories.filter((acc) => !accessoriesToUnregister.includes(acc));
     }
   }
 }
@@ -95,9 +103,7 @@ class DeviceHandler {
   }
 
   // ===== Helpers =====
-  prefix(msg) {
-    return `[${this.config.name}] ${msg}`;
-  }
+  prefix(msg) { return `[${this.config.name}] ${msg}`; }
 
   parseAqThresholds(conf) {
     const def = [5, 15, 35, 55];
@@ -126,9 +132,7 @@ class DeviceHandler {
     try { if (Characteristic.ConfiguredName) service.updateCharacteristic(Characteristic.ConfiguredName, name); } catch (_) {}
   }
 
-  getChildUUID(suffix) {
-    return UUIDGen.generate(`${this.config.ip}-${suffix}`);
-  }
+  getChildUUID(suffix) { return UUIDGen.generate(`${this.config.ip}-${suffix}`); }
 
   ensureChildAccessory(suffix, displayName, serviceType) {
     const uuid = this.getChildUUID(suffix);
@@ -136,10 +140,12 @@ class DeviceHandler {
     if (!acc) {
       acc = new PlatformAccessory(displayName, uuid);
       acc.context.device = this.config;
+      acc.context.isChild = true; // ✅ 자식 표시
       this.platform.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [acc]);
       this.platform.accessories.push(acc);
       this.log.info(this.prefix(`자식 악세서리 추가: ${displayName}`));
     } else {
+      acc.context.isChild = true; // 캐시 복원 시에도 플래그 유지
       const existingSvc = acc.getService(serviceType);
       if (existingSvc) this.setServiceName(existingSvc, displayName);
     }
@@ -156,9 +162,7 @@ class DeviceHandler {
     }
   }
 
-  isMethodNotFound(err) {
-    return err && typeof err.message === 'string' && /method not found/i.test(err.message);
-  }
+  isMethodNotFound(err) { return err && typeof err.message === 'string' && /method not found/i.test(err.message); }
 
   // ===== Device I/O =====
   async connect() {
@@ -476,11 +480,7 @@ class DeviceHandler {
         .setCharacteristic(Characteristic.SerialNumber, this.config.serialNumber || this.config.ip || 'Unknown');
 
     // 펌웨어 버전 = 플러그인 버전
-    try {
-      info.setCharacteristic(Characteristic.FirmwareRevision, packageJson.version);
-    } catch (_) {
-      // 일부 HAP 버전에서 미지원일 수도 있으므로 조용히 무시
-    }
+    try { info.setCharacteristic(Characteristic.FirmwareRevision, packageJson.version); } catch (_) {}
   }
 
   setupAirPurifierMain() {
