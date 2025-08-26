@@ -1,13 +1,10 @@
 {
+  "pluginAlias": "XiaomiAirPurifierPlatform",
+  "pluginType": "platform",
+  "singular": true,
   "schema": {
     "type": "object",
     "properties": {
-      "platform": {
-        "title": "Platform",
-        "type": "string",
-        "default": "XiaomiAirPurifierPlatform",
-        "readOnly": true
-      },
       "deviceCfgs": {
         "title": "Devices",
         "type": "array",
@@ -76,10 +73,10 @@
     }
   },
   "layout": [
-    "platform",
     {
       "key": "deviceCfgs",
       "type": "array",
+      "title": "기기 목록 (ADD DEVICE 버튼으로 추가)",
       "items": [
         "name",
         "ip",
