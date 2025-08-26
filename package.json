@@ -1,6 +1,6 @@
 {
   "name": "@km81/homebridge-xiaomi-airpurifier",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "A modern, single-file Homebridge plugin for Xiaomi Air Purifier 2S and Pro.",
   "main": "index.js",
   "keywords": [
@@ -22,7 +22,7 @@
   },
   "engines": {
     "node": ">=18.0.0",
-    "homebridge": ">=1.1.0"
+    "homebridge": ">=1.10.0"
   },
   "dependencies": {
     "miio": "^0.15.6"
