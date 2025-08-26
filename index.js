@@ -4,7 +4,7 @@ const packageJson = require('./package.json');
 let PlatformAccessory, Service, Characteristic, UUIDGen;
 
 const PLATFORM_NAME = 'XiaomiAirPurifierPlatform';
-const PLUGIN_NAME = 'homebridge-xiaomi-airpurifier';
+const PLUGIN_NAME = '@km81/homebridge-xiaomi-airpurifier';
 
 module.exports = (api) => {
   PlatformAccessory = api.platformAccessory;
@@ -85,15 +85,12 @@ class DeviceHandler {
     this.log = platform.log;
     this.accessory = accessory;
     this.config = accessory.context.device;
-    this.device = null; // miio device instance
+    this.device = null;
     
-    // Set max favorite level based on model
     this.maxFavoriteLevel = this.config.type === 'MiAirPurifier2S' ? 14 : 16;
 
-    // Connect to the device
     this.connect();
     
-    // Setup services
     this.setupAccessoryInfo();
     this.setupAirPurifier();
     
@@ -102,7 +99,13 @@ class DeviceHandler {
     if (this.config.showHumidity !== false) this.setupHumiditySensor();
     if (this.config.showLED === true) this.setupLedSwitch();
     if (this.config.showBuzzer === true) this.setupBuzzerSwitch();
-    if (this.config.showChildLock !== false) this.setupChildLockSwitch();
+    
+    // Mode Switches (configurable)
+    if (this.config.showModeSwitches === true) {
+        this.setupModeSwitch('Auto', 'auto');
+        this.setupModeSwitch('Sleep', 'silent');
+        this.setupModeSwitch('Favorite', 'favorite');
+    }
   }
 
   async connect() {
@@ -117,31 +120,25 @@ class DeviceHandler {
   }
   
   async getPropertyValue(prop) {
-    if (!this.device) {
-        throw new Error('Device not connected');
-    }
+    if (!this.device) throw new Error('Device not connected');
     try {
         const [value] = await this.device.call('get_prop', [prop]);
         return value;
     } catch (e) {
         this.log.error(`Error getting property '${prop}' from ${this.config.name}: ${e.message}`);
-        this.connect(); // Attempt to reconnect
+        this.connect();
         throw e;
     }
   }
   
   async setPropertyValue(method, value) {
-      if (!this.device) {
-          throw new Error('Device not connected');
-      }
+      if (!this.device) throw new Error('Device not connected');
       try {
           const result = await this.device.call(method, value);
-          if (result[0] !== 'ok') {
-              throw new Error(`Device returned an error: ${result[0]}`);
-          }
+          if (result[0] !== 'ok') throw new Error(`Device returned an error: ${result[0]}`);
       } catch (e) {
           this.log.error(`Error setting property with method '${method}' on ${this.config.name}: ${e.message}`);
-          this.connect(); // Attempt to reconnect
+          this.connect();
           throw e;
       }
   }
@@ -161,10 +158,7 @@ class DeviceHandler {
       .onSet(async (value) => this.setPropertyValue('set_power', [value ? 'on' : 'off']));
 
     this.service.getCharacteristic(Characteristic.CurrentAirPurifierState)
-      .onGet(async () => {
-        const power = await this.getPropertyValue('power');
-        return power === 'on' ? Characteristic.CurrentAirPurifierState.PURIFYING_AIR : Characteristic.CurrentAirPurifierState.INACTIVE;
-      });
+      .onGet(async () => (await this.getPropertyValue('power')) === 'on' ? Characteristic.CurrentAirPurifierState.PURIFYING_AIR : Characteristic.CurrentAirPurifierState.INACTIVE);
 
     this.service.getCharacteristic(Characteristic.TargetAirPurifierState)
       .onGet(async () => {
@@ -184,17 +178,15 @@ class DeviceHandler {
       });
 
     this.service.getCharacteristic(Characteristic.FilterChangeIndication)
-        .onGet(async () => {
-            const life = await this.getPropertyValue('filter1_life');
-            return life < 5 ? Characteristic.FilterChangeIndication.CHANGE_FILTER : Characteristic.FilterChangeIndication.FILTER_OK;
-        });
+        .onGet(async () => (await this.getPropertyValue('filter1_life')) < 5 ? Characteristic.FilterChangeIndication.CHANGE_FILTER : Characteristic.FilterChangeIndication.FILTER_OK);
 
     this.service.getCharacteristic(Characteristic.FilterLifeLevel)
         .onGet(async () => await this.getPropertyValue('filter1_life'));
   }
 
   setupAirQualitySensor() {
-    const service = this.accessory.getService(Service.AirQualitySensor) || this.accessory.addService(Service.AirQualitySensor, `${this.config.name} Air Quality`);
+    const name = this.config.airQualityName || `${this.config.name} Air Quality`;
+    const service = this.accessory.getService(name) || this.accessory.addService(Service.AirQualitySensor, name, 'AirQuality');
     
     service.getCharacteristic(Characteristic.AirQuality)
       .onGet(async () => {
@@ -206,20 +198,19 @@ class DeviceHandler {
         return Characteristic.AirQuality.POOR;
       });
       
-    service.getCharacteristic(Characteristic.PM2_5Density)
-        .onGet(async () => await this.getPropertyValue('aqi'));
+    service.getCharacteristic(Characteristic.PM2_5Density).onGet(async () => await this.getPropertyValue('aqi'));
   }
   
   setupTemperatureSensor() {
-      const service = this.accessory.getService(Service.TemperatureSensor) || this.accessory.addService(Service.TemperatureSensor, `${this.config.name} Temperature`);
-      service.getCharacteristic(Characteristic.CurrentTemperature)
-        .onGet(async () => (await this.getPropertyValue('temp_dec')) / 10);
+      const name = this.config.temperatureName || `${this.config.name} Temperature`;
+      const service = this.accessory.getService(name) || this.accessory.addService(Service.TemperatureSensor, name, 'Temperature');
+      service.getCharacteristic(Characteristic.CurrentTemperature).onGet(async () => (await this.getPropertyValue('temp_dec')) / 10);
   }
   
   setupHumiditySensor() {
-      const service = this.accessory.getService(Service.HumiditySensor) || this.accessory.addService(Service.HumiditySensor, `${this.config.name} Humidity`);
-      service.getCharacteristic(Characteristic.CurrentRelativeHumidity)
-        .onGet(async () => await this.getPropertyValue('humidity'));
+      const name = this.config.humidityName || `${this.config.name} Humidity`;
+      const service = this.accessory.getService(name) || this.accessory.addService(Service.HumiditySensor, name, 'Humidity');
+      service.getCharacteristic(Characteristic.CurrentRelativeHumidity).onGet(async () => await this.getPropertyValue('humidity'));
   }
   
   setupLedSwitch() {
@@ -228,8 +219,7 @@ class DeviceHandler {
         .onGet(async () => (await this.getPropertyValue('led')) === 'on')
         .onSet(async (value) => {
             if (this.config.type === 'MiAirPurifierPro') {
-                // Pro uses `led_b` property. 0=bright, 1=dim, 2=off
-                await this.setPropertyValue('set_led_b', [value ? 0 : 2]); 
+                await this.setPropertyValue('set_led_b', [value ? 0 : 2]);
             } else {
                 await this.setPropertyValue('set_led', [value ? 'on' : 'off']);
             }
@@ -243,10 +233,25 @@ class DeviceHandler {
         .onSet(async (value) => this.setPropertyValue('set_buzzer', [value ? 'on' : 'off']));
   }
   
-  setupChildLockSwitch() {
-    const service = this.accessory.getService('Child Lock') || this.accessory.addService(Service.Switch, `${this.config.name} Child Lock`, 'Child Lock');
-    service.getCharacteristic(Characteristic.On)
-      .onGet(async () => (await this.getPropertyValue('child_lock')) === 'on')
-      .onSet(async (value) => this.setPropertyValue('set_child_lock', [value ? 'on' : 'off']));
+  setupModeSwitch(name, modeValue) {
+      const serviceName = `${this.config.name} ${name} Mode`;
+      const service = this.accessory.getService(serviceName) || this.accessory.addService(Service.Switch, serviceName, name);
+      
+      service.getCharacteristic(Characteristic.On)
+        .onGet(() => false) // Always show as off
+        .onSet(async (value) => {
+            if (value) {
+                this.log.info(`Activating ${name} mode for ${this.config.name}`);
+                try {
+                    await this.setPropertyValue('set_mode', [modeValue]);
+                } catch (e) {
+                    this.log.error(`Failed to set mode to ${name} for ${this.config.name}`);
+                }
+                // Turn the switch off after 1 second
+                setTimeout(() => {
+                    service.updateCharacteristic(Characteristic.On, false);
+                }, 1000);
+            }
+        });
   }
 }
