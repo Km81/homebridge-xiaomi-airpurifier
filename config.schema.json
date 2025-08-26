@@ -71,6 +71,19 @@
               "type": "string",
               "condition": { "functionBody": "return model && model.showAirQuality === true;" }
             },
+            "airQualityThresholds": {
+              "title": "Air Quality Thresholds (공기질 임계값 4개: 아주좋음/좋음/보통/나쁨 상한)",
+              "description": "예: [5, 15, 35, 55] → 0~5 매우 좋음(1), 5~15 좋음(2), 15~35 보통(3), 35~55 나쁨(4), 55 초과 매우 나쁨(5)",
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4,
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "default": [5, 15, 35, 55],
+              "condition": { "functionBody": "return model && model.showAirQuality === true;" }
+            },
 
             "showLED": {
               "title": "Show LED Control Switch (LED 제어 스위치 표시)",
@@ -150,6 +163,7 @@
 
         "deviceCfgs[].showAirQuality",
         "deviceCfgs[].airQualityName",
+        "deviceCfgs[].airQualityThresholds",
 
         "deviceCfgs[].showLED",
         "deviceCfgs[].ledName",
