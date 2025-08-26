@@ -72,7 +72,7 @@
             "showLED": {
               "title": "Show LED Control Switch (LED 제어 스위치 표시)",
               "type": "boolean",
-              "default": false"
+              "default": false
             },
             "showBuzzer": {
               "title": "Show Buzzer Control Switch (부저 제어 스위치 표시)",
